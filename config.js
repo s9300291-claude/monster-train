@@ -1,15 +1,8 @@
 /* ============================================================
    怪獸訓練紀錄 — 雲端同步設定
-   ------------------------------------------------------------
-   想要「手機新增、電腦也看得到」的跨裝置同步，請填入下面兩個值。
-   （照 README_設定與部署.md 的步驟，到 Supabase 複製貼上即可）
-
-   如果這兩個值留空，App 仍然可以正常使用，
-   只是紀錄只會存在「這台裝置」（不會跨裝置同步）。
    ============================================================ */
 window.MONSTER_CONFIG = {
-  // 例：https://abcdefghijklmn.supabase.co
-  SUPABASE_URL: "",
-  // 例：eyJhbGciOiJI...（很長的一串 anon public key）
-  SUPABASE_ANON_KEY: ""
+  SUPABASE_URL: "https://ylvmeaupdrnaiaogbrlv.supabase.co",
+  // Supabase Publishable key（可安全用於瀏覽器，搭配 RLS）
+  SUPABASE_ANON_KEY: "sb_publishable_LWavYxNSVAf5pgO2EwUFow_rA8oaj2-"
 };
