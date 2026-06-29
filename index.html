@@ -547,19 +547,22 @@ function injectCard(s){
   var card=document.createElement('div');
   card.className='card cloud-card';card.style.borderColor='#3060a0';
   card.setAttribute('data-key',key);
+  card.setAttribute('data-full',s.full_date);
   RENDERED[key]=card;
   var delBtn='<button class="btn-del-card" title="刪除這筆" onclick="deleteRecord(this)">🗑</button>';
   var badge=s._synced?'<span class="cloud-badge">☁︎</span>':'';
   card.innerHTML='<div class="card-date">'+delBtn+s.date+(wd?' 週'+wd:'')+badge+'</div>'
     +'<div class="card-body">'+exHtml+'</div>'+volHtml;
-  /* 插入正確日期順序 */
+  /* 插入正確日期順序（優先用 data-full；舊卡片用正則只抓 月/日，避免 🗑/☁︎ 干擾） */
   var cards=grid.querySelectorAll('.card');
   var inserted=false;
   for(var i=0;i<cards.length;i++){
-    var dt=cards[i].querySelector('.card-date').textContent.split(' ')[0];
-    var p2=dt.split('/');
-    var cf=s.year+'/'+String(parseInt(p2[0]||0)).padStart(2,'0')+'/'+String(parseInt(p2[1]||0)).padStart(2,'0');
-    if(s.full_date<=cf){grid.insertBefore(card,cards[i]);inserted=true;break;}
+    var cf=cards[i].getAttribute('data-full');
+    if(!cf){
+      var mm=(cards[i].querySelector('.card-date').textContent||'').match(/(\d+)\s*\/\s*(\d+)/);
+      if(mm)cf=s.year+'/'+String(parseInt(mm[1])).padStart(2,'0')+'/'+String(parseInt(mm[2])).padStart(2,'0');
+    }
+    if(cf && s.full_date<=cf){grid.insertBefore(card,cards[i]);inserted=true;break;}
   }
   if(!inserted)grid.appendChild(card);
   /* 更新 header 計數 */
