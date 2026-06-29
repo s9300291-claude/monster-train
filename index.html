@@ -138,6 +138,13 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
 .toast.show{opacity:1}
 /* 雲端同步狀態 + 匯入按鈕 */
 .btn-import{background:#3a2e1e;color:#f0c060;border:1px solid #5a4a2a}
+.btn-bulk{background:#22304a;color:#7db0ff;border:1px solid #2e4a70}
+.bulk-row{display:flex;justify-content:space-between;gap:8px;font-size:.72rem;padding:4px 0;border-bottom:1px solid #1a1e35}
+.bulk-row:last-child{border:none}
+.bulk-row .bd{color:#7da0ff;font-weight:700}
+.bulk-row .bv{color:#9098c0}
+.bulk-row.dup .bd{color:#806040}.bulk-row.dup .bv{color:#5d5040}
+
 .sync-pill{display:inline-flex;align-items:center;gap:5px;font-size:.66rem;padding:3px 9px;border-radius:20px;border:1px solid #2e3560;background:#11142a;color:#5d6490;cursor:default}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:#5d6490;flex-shrink:0}
 .sync-pill.on .sync-dot{background:#50d090;box-shadow:0 0 6px #50d090}
@@ -198,6 +205,7 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
 <div class="panel on" id="panel-log">
   <div class="toolbar">
     <button class="btn btn-add" onclick="openAddModal()">➕ 新增訓練</button>
+    <button class="btn btn-bulk" onclick="openBulkModal()">📋 批次貼上</button>
     <button class="btn btn-import" onclick="document.getElementById('importFile').click()">📤 匯入</button>
     <button class="btn btn-csv"  onclick="exportCSV()">📥 匯出 CSV</button>
     <button class="btn btn-json" onclick="exportJSON()">💾 匯出 JSON</button>
@@ -313,6 +321,26 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
     <button class="btn-save"   onclick="saveNewSession()">儲存</button>
   </div>
 </div>
+</div>
+<!-- 批次貼上 -->
+<div id="bulkModal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">📋 批次貼上紀錄</div>
+    <div class="form-group">
+      <span class="form-label">起始年份（沒寫年份的日期會用這個；月份跳回變小時自動 +1 年）</span>
+      <select id="bulkYear" class="yr-select" onchange="previewBulk()"></select>
+    </div>
+    <div class="form-group">
+      <span class="form-label">把一段時間的紀錄整段貼上：每個「日期」單獨一行，下面接當天動作（一行一個），不同天用空行隔開</span>
+      <textarea id="bulkInput" class="form-textarea" style="height:190px" oninput="previewBulk()" placeholder="2026/06/06&#10;傳統硬舉槓鈴5*3*3*3 60 80 90 95&#10;肩推槓鈴8*3 30 35 35&#10;&#10;06/13&#10;握把蹲SSB 5*3 75 95 105&#10;..."></textarea>
+    </div>
+    <div class="form-label" style="margin-bottom:4px">預覽（偵測到的每一天）</div>
+    <div id="bulkPreview" class="vol-preview" style="max-height:180px;overflow:auto">尚未偵測到紀錄</div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeBulkModal()">取消</button>
+      <button class="btn-save" id="bulkConfirmBtn" onclick="confirmBulkImport()">確認匯入</button>
+    </div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -894,6 +922,76 @@ function importFromFile(input){
     input.value='';
   };
   reader.readAsText(file);
+}
+
+/* ── 批次貼上：把一段文字依日期切成多筆 ── */
+var __bulkParsed=[];
+function openBulkModal(){
+  var sel=document.getElementById('bulkYear');
+  if(sel && !sel.options.length){
+    var cur=new Date().getFullYear();
+    for(var y=cur;y>=2021;y--){var o=document.createElement('option');o.value=y;o.textContent=y+' 年';sel.appendChild(o);}
+    sel.value=cur;
+  }
+  document.getElementById('bulkInput').value='';
+  document.getElementById('bulkPreview').innerHTML='尚未偵測到紀錄';
+  __bulkParsed=[];
+  document.getElementById('bulkModal').style.display='flex';
+}
+function closeBulkModal(){document.getElementById('bulkModal').style.display='none';}
+function parseBulkSessions(raw,startYear){
+  var lines=(raw||'').replace(/\r/g,'').split('\n');
+  /* 整行就是日期才算（避免動作行誤判）：可有年份、(週X) 之類後綴 */
+  var dateRe=/^\s*(?:(\d{4})[\/\-])?(\d{1,2})[\/\-](\d{1,2})\s*(?:[（(][^）)]*[）)])?\s*$/;
+  var out=[],cur=null,year=startYear,prevMonth=null;
+  lines.forEach(function(ln){
+    var t=ln.trim();
+    if(!t){return;}
+    var m=t.match(dateRe);
+    if(m){
+      if(cur)out.push(cur);
+      var mo=parseInt(m[2]),dy=parseInt(m[3]);
+      if(m[1]){year=parseInt(m[1]);}
+      else if(prevMonth!==null && mo<prevMonth){year=year+1;}
+      prevMonth=mo;
+      cur={year:year,month:mo,day:dy,exs:[]};
+    }else if(cur){
+      cur.exs.push(t);
+    }
+  });
+  if(cur)out.push(cur);
+  return out.map(function(s){
+    var fd=s.year+'/'+String(s.month).padStart(2,'0')+'/'+String(s.day).padStart(2,'0');
+    var content=s.exs.join(' ｜ ');
+    return {year:s.year,date:s.month+'/'+s.day,full_date:fd,content:content,volume:sessionVolumeJS(content)};
+  }).filter(function(r){return r.content;});
+}
+function previewBulk(){
+  var raw=document.getElementById('bulkInput').value;
+  var yr=parseInt(document.getElementById('bulkYear').value)||new Date().getFullYear();
+  __bulkParsed=parseBulkSessions(raw,yr);
+  var box=document.getElementById('bulkPreview');
+  if(!__bulkParsed.length){box.innerHTML='尚未偵測到紀錄（請確認每天的日期各自單獨一行）';return;}
+  var newN=0,dupN=0,html='';
+  __bulkParsed.forEach(function(r){
+    var dup=isDuplicate(r); if(dup)dupN++; else newN++;
+    var n=r.content.split('｜').filter(function(x){return x.trim();}).length;
+    html+='<div class="bulk-row'+(dup?' dup':'')+'"><span class="bd">'+(dup?'⚠ ':'✓ ')+r.full_date+'</span>'
+      +'<span class="bv">'+n+' 動作　'+(r.volume?r.volume.toLocaleString()+' kg':'—')+(dup?'　已存在':'')+'</span></div>';
+  });
+  box.innerHTML='<div style="margin-bottom:6px;color:#9db0e0">共偵測到 <b>'+__bulkParsed.length+'</b> 天　將新增 <b style="color:#50d090">'+newN+'</b> 筆，略過 <b>'+dupN+'</b> 筆重複</div>'+html;
+  document.getElementById('bulkConfirmBtn').textContent=newN?('確認匯入 '+newN+' 筆'):'沒有可匯入的紀錄';
+}
+function confirmBulkImport(){
+  if(!__bulkParsed.length){alert('沒有偵測到紀錄');return;}
+  var added=0,skipped=0;
+  __bulkParsed.forEach(function(r){
+    if(!r.full_date||!r.content){skipped++;return;}
+    if(isDuplicate(r)){skipped++;return;}
+    persistRecord(r);added++;
+  });
+  recomputeDerived();updateLocalCount();closeBulkModal();
+  showToast('📋 批次匯入完成：新增 '+added+' 筆，略過 '+skipped+' 筆重複');
 }
 
 /* ── Service Worker（離線 + 安裝） ── */
