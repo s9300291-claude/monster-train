@@ -10,8 +10,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- 外部函式庫：釘選確切版本 + SRI 完整性驗證（防 CDN 竄改／自動升級造成故障） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.min.js" integrity="sha384-UagCvVPT5XXA0Hx+nJYUAGBFseHT9zBgpJMSebsAxl9lciTwbT+39j5VfRjdP5Tp" crossorigin="anonymous"></script>
 <script src="config.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -144,7 +145,6 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
 .bulk-row .bd{color:#7da0ff;font-weight:700}
 .bulk-row .bv{color:#9098c0}
 .bulk-row.dup .bd{color:#806040}.bulk-row.dup .bv{color:#5d5040}
-
 .sync-pill{display:inline-flex;align-items:center;gap:5px;font-size:.66rem;padding:3px 9px;border-radius:20px;border:1px solid #2e3560;background:#11142a;color:#5d6490;cursor:default}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:#5d6490;flex-shrink:0}
 .sync-pill.on .sync-dot{background:#50d090;box-shadow:0 0 6px #50d090}
@@ -153,7 +153,12 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
 .sync-pill.busy .sync-dot{background:#7da0ff;animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 .btn-del-card{float:right;background:none;border:none;color:#4a3050;cursor:pointer;font-size:.7rem;padding:0 2px;line-height:1}
-.card:hover .btn-del-card{color:#c06080}
+.card:hover .btn-del-card,.btn-del-card:focus-visible{color:#c06080}
+/* 觸控裝置沒有 hover：刪除鈕常駐可見、加大點擊範圍 */
+@media (hover:none){.btn-del-card{color:#a05070;font-size:.85rem;padding:4px 6px;margin:-4px -6px 0 0}}
+.sync-pill{cursor:pointer}
+.btn-save:disabled{opacity:.4;cursor:not-allowed}
+.btn:focus-visible,.mtab:focus-visible,.yr-tab:focus-visible,.sync-pill:focus-visible,.btn-del-card:focus-visible,.btn-save:focus-visible,.btn-cancel:focus-visible{outline:2px solid #7da0ff;outline-offset:2px}
 .cloud-badge{font-size:.55rem;color:#50d090;border:1px solid #2a4a3a;border-radius:8px;padding:0 5px;margin-left:5px;vertical-align:middle}
 /* ── 手機 / 平板響應式 ── */
 @media (max-width:760px){
@@ -210,7 +215,7 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
     <button class="btn btn-csv"  onclick="exportCSV()">📥 匯出 CSV</button>
     <button class="btn btn-json" onclick="exportJSON()">💾 匯出 JSON</button>
     <input type="file" id="importFile" accept=".csv,.json,text/csv,application/json" style="display:none" onchange="importFromFile(this)">
-    <span class="sync-pill" id="syncPill" title="點擊重新同步" onclick="cloudResync()"><span class="sync-dot"></span><span id="syncText">本機模式</span></span>
+    <span class="sync-pill" id="syncPill" role="button" tabindex="0" title="點擊重新同步" aria-label="雲端同步狀態，點擊重新同步" onclick="cloudResync()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cloudResync();}"><span class="sync-dot"></span><span id="syncText">本機模式</span></span>
     <span class="toolbar-note" id="localCount"></span>
   </div>
   <div class="log-layout">
@@ -327,11 +332,11 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
   <div class="modal-box">
     <div class="modal-title">📋 批次貼上紀錄</div>
     <div class="form-group">
-      <span class="form-label">起始年份（沒寫年份的日期會用這個；月份跳回變小時自動 +1 年）</span>
+      <label class="form-label" for="bulkYear">起始年份（沒寫年份的日期會用這個；跨年時（如 12 月→1 月）自動 +1 年，請在預覽確認年份）</label>
       <select id="bulkYear" class="yr-select" onchange="previewBulk()"></select>
     </div>
     <div class="form-group">
-      <span class="form-label">把一段時間的紀錄整段貼上：每個「日期」單獨一行，下面接當天動作（一行一個），不同天用空行隔開</span>
+      <label class="form-label" for="bulkInput">把一段時間的紀錄整段貼上：每個「日期」單獨一行，下面接當天動作（一行一個），不同天用空行隔開</label>
       <textarea id="bulkInput" class="form-textarea" style="height:190px" oninput="previewBulk()" placeholder="2026/06/06&#10;傳統硬舉槓鈴5*3*3*3 60 80 90 95&#10;肩推槓鈴8*3 30 35 35&#10;&#10;06/13&#10;握把蹲SSB 5*3 75 95 105&#10;..."></textarea>
     </div>
     <div class="form-label" style="margin-bottom:4px">預覽（偵測到的每一天）</div>
@@ -342,7 +347,7 @@ body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;bac
     </div>
   </div>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 /* ── 資料 ── */
@@ -397,30 +402,72 @@ function sessionVolumeJS(c){
   return Math.round(c.split('｜').reduce(function(s,e){return s+parseVolumeJS(e.trim());},0));
 }
 
-/* ── localStorage ── */
+/* ── localStorage（讀寫皆防例外：隱私模式／空間已滿時不讓整個 App 當掉） ── */
 var LOCAL_KEY='monster_v1';
-function loadLocal(){try{return JSON.parse(localStorage.getItem(LOCAL_KEY)||'[]');}catch(e){return[];}}
-function saveLocal(a){localStorage.setItem(LOCAL_KEY,JSON.stringify(a));}
+var TOMB_KEY='monster_v1_deleted';   /* 待同步到雲端的刪除（離線刪除也不會「復活」） */
+var __storageWarned=false;
+function loadJSON(key){
+  try{var v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v:[];}catch(e){return [];}
+}
+function saveJSON(key,arr){
+  try{localStorage.setItem(key,JSON.stringify(arr));return true;}
+  catch(e){
+    if(!__storageWarned){__storageWarned=true;showToast('⚠ 無法寫入本機儲存空間（可能是隱私模式或空間不足），紀錄僅暫存於本次開啟');}
+    return false;
+  }
+}
+function loadLocal(){return loadJSON(LOCAL_KEY);}
+function saveLocal(a){return saveJSON(LOCAL_KEY,a);}
 function updateLocalCount(){
   var n=loadLocal().length;
   var el=document.getElementById('localCount');
-  if(el)el.textContent=n?'已新增 '+n+' 筆本機紀錄':'';
+  if(el)el.textContent=n?'已新增 '+n+' 筆紀錄':'';
+}
+
+/* ── 共用小工具 ── */
+function escapeHTML(s){
+  return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function pad2(n){return String(n).padStart(2,'0');}
+function validYMD(y,m,d){
+  if(!(y>=2000&&y<=2100&&m>=1&&m<=12&&d>=1&&d<=31))return false;
+  var dt=new Date(y,m-1,d);
+  return dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d;
+}
+function toFullDate(y,m,d){return y+'/'+pad2(m)+'/'+pad2(d);}
+/* 整行只有日期才算日期行：2026/6/6、6/6、06-13、6/20(六)…；回傳 {y(可能 null),m,d} 或 null */
+var DATE_LINE_RE=/^\s*(?:(\d{4})[\/\-])?(\d{1,2})[\/\-](\d{1,2})\s*(?:[（(][^）)]*[）)])?\s*$/;
+function matchDateLine(t,fallbackYear){
+  var m=String(t||'').match(DATE_LINE_RE);
+  if(!m)return null;
+  var y=m[1]?parseInt(m[1],10):null,mo=parseInt(m[2],10),d=parseInt(m[3],10);
+  if(!validYMD(y||fallbackYear||2000,mo,d))return null;   /* 13/40 之類不是日期 */
+  return {y:y,m:mo,d:d};
 }
 
 /* ── 匯出 ── */
 function recKey(s){return (s.full_date||'')+'|'+(s.content||'');}
+/* 對外的欄位（匯出／上傳雲端用，不帶 _synced/_id 等內部欄位） */
+function publicRec(s){return {year:s.year,date:s.date,full_date:s.full_date,content:s.content,volume:s.volume||0};}
 function allSessions(){
   var seen={},out=[];
   ALL_SESSIONS.concat(loadLocal()).forEach(function(s){
-    var k=recKey(s);if(seen[k])return;seen[k]=1;out.push(s);
+    var k=recKey(s);if(seen[k])return;seen[k]=1;out.push(publicRec(s));
   });
   return out.sort(function(a,b){return (a.full_date||'').localeCompare(b.full_date||'');});
+}
+/* CSV 儲存格：加引號跳脫；開頭是 = + - @ 時前置 ' 避免被 Excel 當公式執行 */
+function csvCell(v){
+  var s=String(v==null?'':v);
+  if(/^[=+\-@\t\r]/.test(s))s="'"+s;
+  return '"'+s.replace(/"/g,'""')+'"';
 }
 function exportCSV(){
   var rows=['﻿年份,日期,完整日期,訓練內容,訓練量(kg)'];
   allSessions().forEach(function(s){
-    var c=(s.content||'').replace(/"/g,'""');
-    rows.push([s.year,s.date,s.full_date||'','"'+c+'"',s.volume||0].join(','));
+    rows.push([s.year,s.date,s.full_date||'',csvCell(s.content),s.volume||0].join(','));
   });
   dlFile('怪獸訓練紀錄.csv',rows.join('\r\n'),'text/csv;charset=utf-8');
 }
@@ -428,9 +475,10 @@ function exportJSON(){
   dlFile('怪獸訓練紀錄.json',JSON.stringify(allSessions(),null,2),'application/json');
 }
 function dlFile(name,text,mime){
+  var url=URL.createObjectURL(new Blob([text],{type:mime}));
   var a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([text],{type:mime}));
-  a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);   /* 釋放記憶體 */
 }
 
 /* ── Modal ── */
@@ -473,20 +521,20 @@ function parsePasteInput(){
     return;
   }
   var lines=raw.split(/\n/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
-  var dateRe=/^(\d{4}[/\-])?\d{1,2}[/\-]\d{1,2}$/;
-  var hasDate=lines.length>0 && dateRe.test(lines[0]);
+  var selYr=parseInt(document.getElementById('parsedYear').value,10)||new Date().getFullYear();
+  var dl=lines.length?matchDateLine(lines[0],selYr):null;
+  var hasDate=!!dl;
   var exLines=hasDate?lines.slice(1):lines;
-  // 日期解析
-  var mdStr='', fullDate='';
+  // 日期解析（含有效日期檢查）
+  var mdStr='';
   if(hasDate){
-    var dp=lines[0].replace(/-/g,'/').split('/');
-    var yr=parseInt(document.getElementById('parsedYear').value)||new Date().getFullYear();
-    if(dp.length===3){yr=parseInt(dp[0]);mdStr=parseInt(dp[1])+'/'+parseInt(dp[2]);}
-    else{mdStr=parseInt(dp[0])+'/'+parseInt(dp[1]);}
-    var m=parseInt(mdStr.split('/')[0]),d=parseInt(mdStr.split('/')[1]);
-    fullDate=yr+'/'+String(m).padStart(2,'0')+'/'+String(d).padStart(2,'0');
-    // 自動填日期欄位
-    document.getElementById('newDate').value=yr+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var yr=dl.y||selYr;
+    mdStr=dl.m+'/'+dl.d;
+    if(validYMD(yr,dl.m,dl.d)){
+      document.getElementById('newDate').value=yr+'-'+pad2(dl.m)+'-'+pad2(dl.d);   // 自動填日期欄位
+    }else{
+      mdStr+='（'+yr+' 年沒有這一天）';
+    }
   }
   document.getElementById('pastePreview').style.display=hasDate?'block':'none';
   document.getElementById('parsedDate').textContent=mdStr||'（未偵測到）';
@@ -526,8 +574,8 @@ function getContent(){
   if(document.getElementById('ms-paste').classList.contains('on')){
     var raw=document.getElementById('pasteContent').value.trim();
     var lines=raw.split(/\n/).map(function(l){return l.trim();}).filter(function(l){return l.length>0;});
-    var dateRe=/^(\d{4}[/\-])?\d{1,2}[/\-]\d{1,2}$/;
-    var exLines=lines.length>0&&dateRe.test(lines[0])?lines.slice(1):lines;
+    var selYr=parseInt(document.getElementById('parsedYear').value,10)||new Date().getFullYear();
+    var exLines=lines.length>0&&matchDateLine(lines[0],selYr)?lines.slice(1):lines;
     return exLines.join(' ｜ ');
   }
   return document.getElementById('newContent').value.replace(/\n+/g,' ｜ ').replace(/\s*｜\s*/g,' ｜ ');
@@ -548,9 +596,8 @@ function saveNewSession(){
     full_date:yr+'/'+String(mo).padStart(2,'0')+'/'+String(dy).padStart(2,'0'),
     content:c,volume:sessionVolumeJS(c)};
   if(isDuplicate(s)){alert('這一天已有相同內容的紀錄了');return;}
-  persistRecord(s);
-  recomputeDerived();
-  updateLocalCount();closeAddModal();
+  persistRecords([s]);
+  closeAddModal();
   showToast('✅ 已儲存 '+s.full_date+'，訓練量 '+s.volume.toLocaleString()+' kg');
 }
 
@@ -559,27 +606,29 @@ var RENDERED={};  /* key -> card element，避免重複注入、供刪除用 */
 function injectCard(s){
   var key=recKey(s);
   if(RENDERED[key])return;          /* 已顯示則略過（去重） */
-  var panel=document.getElementById('yr-'+s.year);
-  if(!panel)panel=createYrPanel(s.year);
+  var yr=parseInt(s.year,10);
+  if(!(yr>=2000&&yr<=2100)||!s.full_date)return;
+  var panel=document.getElementById('yr-'+yr);
+  if(!panel)panel=createYrPanel(yr);
   var grid=panel.querySelector('.cards-grid');
   if(!grid)return;
   var days=['日','一','二','三','四','五','六'];
   var wd=days[new Date(s.full_date).getDay()]||'';
   var exHtml='';
-  s.content.split('｜').forEach(function(ex){
+  String(s.content||'').split('｜').forEach(function(ex){
     ex=ex.trim();if(!ex)return;
-    var lc=ex.replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    exHtml+='<div class="ex '+(/\d+\*\d+/.test(ex)?'main':'warm')+'">'+lc+'</div>';
+    exHtml+='<div class="ex '+(/\d+\*\d+/.test(ex)?'main':'warm')+'">'+escapeHTML(ex)+'</div>';
   });
-  var volHtml=s.volume?'<div class="card-vol">📊 訓練量 <b>'+s.volume.toLocaleString()+' kg</b></div>':'';
+  var vol=Number(s.volume)||0;
+  var volHtml=vol?'<div class="card-vol">📊 訓練量 <b>'+vol.toLocaleString()+' kg</b></div>':'';
   var card=document.createElement('div');
   card.className='card cloud-card';card.style.borderColor='#3060a0';
   card.setAttribute('data-key',key);
   card.setAttribute('data-full',s.full_date);
   RENDERED[key]=card;
-  var delBtn='<button class="btn-del-card" title="刪除這筆" onclick="deleteRecord(this)">🗑</button>';
-  var badge=s._synced?'<span class="cloud-badge">☁︎</span>':'';
-  card.innerHTML='<div class="card-date">'+delBtn+s.date+(wd?' 週'+wd:'')+badge+'</div>'
+  var delBtn='<button class="btn-del-card" title="刪除這筆" aria-label="刪除 '+escapeHTML(s.full_date)+' 的紀錄" onclick="deleteRecord(this)">🗑</button>';
+  var badge=s._synced?'<span class="cloud-badge" title="已同步到雲端">☁︎</span>':'';
+  card.innerHTML='<div class="card-date">'+delBtn+escapeHTML(s.date)+(wd?' 週'+wd:'')+badge+'</div>'
     +'<div class="card-body">'+exHtml+'</div>'+volHtml;
   /* 插入正確日期順序（優先用 data-full；舊卡片用正則只抓 月/日，避免 🗑/☁︎ 干擾） */
   var cards=grid.querySelectorAll('.card');
@@ -593,23 +642,105 @@ function injectCard(s){
     if(cf && s.full_date<=cf){grid.insertBefore(card,cards[i]);inserted=true;break;}
   }
   if(!inserted)grid.appendChild(card);
-  /* 更新 header 計數 */
-  var sp=panel.querySelector('.yr-header span');
-  if(sp){var n=parseInt(sp.textContent)||0;sp.textContent=(n+1)+' 次訓練';}
+  /* 各處計數由 refreshCounts() 統一重算 */
+}
+function removeCard(key){
+  var card=RENDERED[key];
+  if(card&&card.parentNode)card.parentNode.removeChild(card);
+  delete RENDERED[key];
 }
 function createYrPanel(yr){
+  yr=parseInt(yr,10);
   var sb=document.querySelector('.sidebar');
   if(sb){
     var btn=document.createElement('button');
     btn.className='yr-tab';btn.setAttribute('data-yr',yr);
     btn.onclick=function(){switchYear(yr);};
     btn.innerHTML=yr+'<span class="yr-cnt">0 次</span>';
-    sb.appendChild(btn);
+    /* 依年份排序插入（匯入較早年份時不會排到最後） */
+    var after=null;
+    sb.querySelectorAll('.yr-tab').forEach(function(t){if(!after&&parseInt(t.getAttribute('data-yr'),10)>yr)after=t;});
+    sb.insertBefore(btn,after);
   }
   var lm=document.getElementById('logMain');
   var div=document.createElement('div');div.className='yr-panel';div.id='yr-'+yr;
-  div.innerHTML='<div class="yr-header">'+yr+' <span>0 次訓練</span></div><div class="cards-grid"></div>';
+  div.innerHTML='<div class="yr-header">'+yr+' <span>0 次訓練</span> <span>次均訓練量 0 kg</span></div><div class="cards-grid"></div>';
   lm.appendChild(div);return div;
+}
+
+/* ── 統一重算各處次數／訓練量（頁首統計、長條圖、側欄、年度標題、年度統計卡） ── */
+function yearStats(){
+  var st={};
+  function add(s){
+    var y=String(s.year);if(!/^\d{4}$/.test(y))return;
+    var o=st[y]||(st[y]={n:0,vol:0,max:0,min:Infinity});
+    var v=Number(s.volume)||0;
+    o.n++;o.vol+=v;
+    if(v>0){if(v>o.max)o.max=v;if(v<o.min)o.min=v;}
+  }
+  ALL_SESSIONS.forEach(add);
+  loadLocal().forEach(function(s){if(!BASE_KEYS[recKey(s)])add(s);});
+  return st;
+}
+function refreshCounts(){
+  var st=yearStats(),years=Object.keys(st).sort(),total=0,maxN=0;
+  years.forEach(function(y){total+=st[y].n;if(st[y].n>maxN)maxN=st[y].n;});
+  var fmt=function(n){return Math.round(n).toLocaleString();};
+  /* 頁首統計 */
+  var stats=document.querySelector('.stats');
+  if(stats){
+    var byLabel={};
+    stats.querySelectorAll('.st').forEach(function(el){var l=el.querySelector('.st-l');if(l)byLabel[l.textContent.trim()]=el.querySelector('.st-n');});
+    if(byLabel['次訓練'])byLabel['次訓練'].textContent=total;
+    if(byLabel['年'])byLabel['年'].textContent=years.length;
+    years.forEach(function(y){
+      if(!byLabel[y]){
+        var d=document.createElement('div');d.className='st';
+        d.innerHTML='<div class="st-n"></div><div class="st-l">'+y+'</div>';
+        stats.appendChild(d);byLabel[y]=d.querySelector('.st-n');
+      }
+      byLabel[y].textContent=st[y].n;
+    });
+  }
+  /* 各年訓練次數長條圖 */
+  var bar=document.querySelector('.bar-chart');
+  if(bar){
+    var bws={};
+    bar.querySelectorAll('.bw').forEach(function(b){var l=b.querySelector('.bl');if(l)bws[l.textContent.trim()]=b;});
+    years.forEach(function(y){
+      var b=bws[y];
+      if(!b){
+        b=document.createElement('div');b.className='bw';
+        b.setAttribute('onclick','switchToLog('+parseInt(y,10)+')');
+        b.innerHTML='<div class="bn"></div><div class="b" style="background:'+(YEAR_COLORS_MAP[y]||'#7da0ff')+'"></div><div class="bl">'+y+'</div>';
+        bar.appendChild(b);
+      }
+      b.querySelector('.bn').textContent=st[y].n;
+      b.querySelector('.b').style.height=Math.max(4,Math.floor(st[y].n/(maxN||1)*80))+'px';   /* 與原本頁面相同：無條件捨去 */
+    });
+  }
+  /* 側欄年份、年度標題 */
+  years.forEach(function(y){
+    var cnt=document.querySelector('.yr-tab[data-yr="'+y+'"] .yr-cnt');
+    if(cnt)cnt.textContent=st[y].n+' 次';
+    var spans=document.querySelectorAll('#yr-'+y+' .yr-header span');
+    if(spans[0])spans[0].textContent=st[y].n+' 次訓練';
+    if(spans[1])spans[1].textContent='次均訓練量 '+fmt(st[y].n?st[y].vol/st[y].n:0)+' kg';
+  });
+  /* 訓練量頁的年度統計卡 */
+  document.querySelectorAll('.vs-card').forEach(function(c){
+    var yEl=c.querySelector('.vs-yr'),y=yEl&&yEl.textContent.trim(),o=st[y];if(!o)return;
+    c.querySelectorAll('.vs-row').forEach(function(r){
+      var l=r.querySelector('.vs-lbl'),v=r.querySelector('.vs-val');if(!l||!v)return;
+      switch(l.textContent.trim()){
+        case '年度總量':v.textContent=fmt(o.vol)+' kg';break;
+        case '訓練次數':v.textContent=o.n+' 次';break;
+        case '次均量':v.textContent=fmt(o.n?o.vol/o.n:0)+' kg';break;
+        case '單次最高':if(o.max>0)v.textContent=fmt(o.max)+' kg';break;
+        case '單次最低':if(o.min<Infinity)v.textContent=fmt(o.min)+' kg';break;
+      }
+    });
+  });
 }
 
 /* ── 圖表 ── */
@@ -677,16 +808,18 @@ function switchToLog(yr){
   showMain('log',document.querySelector('.mtab'));
   setTimeout(function(){switchYear(yr);},50);
 }
+var __toastTimer=null;
 function showToast(msg){
-  var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
-  setTimeout(function(){t.classList.remove('show');},3500);
+  var t=document.getElementById('toast');if(!t)return;
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(__toastTimer);   /* 連續提示時不會被前一個計時器提早關掉 */
+  __toastTimer=setTimeout(function(){t.classList.remove('show');},3500);
 }
 
 /* ============================================================
    ☁︎ 雲端同步 / 匯入 / 刪除 / 圖表重算（新增模組）
    ============================================================ */
 var volChart1=null, volChart2=null;
-var SB=null, CLOUD_ON=false, SB_TABLE='sessions';
 var EXTRA_COLORS=['#e07090','#70c0e0','#c0a040','#80d0a0','#a070e0','#e09040'];
 
 /* 歷史基準快照（圖表重算的起點） */
@@ -697,40 +830,63 @@ var YEAR_COLORS_BASE=JSON.parse(JSON.stringify(YEAR_COLORS_MAP));
 var BASE_KEYS={}; ALL_SESSIONS.forEach(function(s){BASE_KEYS[recKey(s)]=1;});
 
 /* ── 重複判斷 ── */
-function isDuplicate(s){
+function keysOf(cache){
+  var set={};for(var k in BASE_KEYS)set[k]=1;
+  cache.forEach(function(r){set[recKey(r)]=1;});
+  return set;
+}
+function existingKeys(){return keysOf(loadLocal());}
+function isDuplicate(s,keys){
   var k=recKey(s);
+  if(keys)return !!keys[k];
   if(BASE_KEYS[k])return true;
   return loadLocal().some(function(r){return recKey(r)===k;});
 }
 
-/* ── 儲存一筆（本機 + 雲端） ── */
-function persistRecord(s){
-  var cache=loadLocal();
-  s._synced=false;
-  cache.push(s); saveLocal(cache);
-  injectCard(s);
-  cloudPush(s);
+/* ── 儲存（本機 + 雲端）：一次處理多筆＝只讀寫 localStorage 一次、只呼叫一次雲端 API ── */
+function persistRecords(list){
+  if(!list||!list.length)return 0;
+  var cache=loadLocal(),keys=keysOf(cache),added=[];
+  list.forEach(function(s){
+    if(!s||!s.full_date||!s.content)return;
+    var k=recKey(s);if(keys[k])return;keys[k]=1;   /* 也去除同一批內的重複 */
+    var r=publicRec(s);r._synced=false;
+    cache.push(r);added.push(r);
+  });
+  if(!added.length)return 0;
+  saveLocal(cache);
+  added.forEach(injectCard);
+  recomputeDerived();refreshCounts();updateLocalCount();
+  cloudPushBatch(added);
+  return added.length;
 }
 
-/* ── 刪除一筆 ── */
+/* ── 刪除一筆（有設定雲端時記下「待刪除」，離線刪除之後也會同步，不會復活） ── */
 function deleteRecord(btn){
-  var card=btn.closest('.card');
+  var card=btn&&btn.closest('.card');if(!card)return;
   var key=card.getAttribute('data-key');
   if(!confirm('確定刪除這筆訓練紀錄？'))return;
-  var cache=loadLocal();
   var rec=null;
-  cache=cache.filter(function(r){ if(recKey(r)===key){rec=r;return false;} return true; });
+  var cache=loadLocal().filter(function(r){if(recKey(r)===key){rec=rec||r;return false;}return true;});
   saveLocal(cache);
-  cloudDelete(rec);
-  var panel=card.closest('.yr-panel');
-  card.remove(); delete RENDERED[key];
-  if(panel){var sp=panel.querySelector('.yr-header span');
-    if(sp){var n=parseInt(sp.textContent)||0;sp.textContent=Math.max(0,n-1)+' 次訓練';}}
-  updateLocalCount(); recomputeDerived();
+  if(rec&&cloudConfigured()){
+    var t=loadJSON(TOMB_KEY);t.push({full_date:rec.full_date,content:rec.content});saveJSON(TOMB_KEY,t);
+    cloudEnqueue(flushTombstones);
+  }
+  removeCard(key);
+  updateLocalCount();recomputeDerived();refreshCounts();
   showToast('🗑 已刪除');
 }
 
 /* ── 圖表資料重算（基準 + 使用者紀錄） ── */
+/* 進步曲線的動作別名（依歷史紀錄中實際出現的寫法；例如「握把蹲SSB」比「SSB握把蹲」更常用） */
+var LIFT_ALIASES={
+  'SSB握把蹲':['握把蹲SSB','握把SSB蹲','SSB深蹲'],
+  '傳統硬舉':['硬舉傳統'],
+  '六角槓硬舉':['硬舉六角槓'],
+  '相撲硬舉':['相撲槓鈴硬舉','相撲應舉'],
+  '低背蹲/背蹲':['背槓蹲','背槓深蹲']
+};
 function maxLiftWeight(content,keys){
   var best=0;
   (content||'').split('｜').forEach(function(seg){
@@ -750,14 +906,16 @@ function extendDerivedWith(s){
   var fd=s.full_date, yr=String(s.year);
   if(!fd)return;
   if(!YEAR_COLORS_MAP[yr])YEAR_COLORS_MAP[yr]=EXTRA_COLORS[Object.keys(YEAR_COLORS_MAP).length%EXTRA_COLORS.length];
-  if(s.volume){
-    VOL_TIMELINE.push({x:fd,y:s.volume});
+  var vol=Number(s.volume)||0;
+  if(vol){
+    VOL_TIMELINE.push({x:fd,y:vol});
     var ym=fd.slice(0,7),found=false;
-    for(var i=0;i<VOL_MONTHLY.length;i++){if(VOL_MONTHLY[i][0]===ym){VOL_MONTHLY[i][1]+=s.volume;VOL_MONTHLY[i][2]=(VOL_MONTHLY[i][2]||0)+1;found=true;break;}}
-    if(!found)VOL_MONTHLY.push([ym,s.volume,1]);
+    for(var i=0;i<VOL_MONTHLY.length;i++){if(VOL_MONTHLY[i][0]===ym){VOL_MONTHLY[i][1]+=vol;VOL_MONTHLY[i][2]=(VOL_MONTHLY[i][2]||0)+1;found=true;break;}}
+    if(!found)VOL_MONTHLY.push([ym,vol,1]);
   }
   CHARTS_DATA.forEach(function(c){
-    var keys=c.title.replace(/（.*$/,'').split('/');
+    var base=c.title.replace(/（.*$/,'');
+    var keys=base.split('/').concat(LIFT_ALIASES[base]||[]);
     var w=maxLiftWeight(s.content,keys);
     if(w>0){
       var idx=c.labels.length;
@@ -767,13 +925,19 @@ function extendDerivedWith(s){
     }
   });
 }
-function recomputeDerived(){
+var __derivedSig=null;
+function recomputeDerived(force){
+  var cache=loadLocal().filter(function(r){return !BASE_KEYS[recKey(r)];});
+  /* 資料沒變就不重算、不重繪（自動同步時避免圖表一直閃爍重建） */
+  var sig=cache.map(recKey).sort().join('\n');
+  if(!force&&sig===__derivedSig)return;
+  __derivedSig=sig;
   CHARTS_DATA=JSON.parse(JSON.stringify(CHARTS_BASE));
   VOL_TIMELINE=JSON.parse(JSON.stringify(VOL_TIMELINE_BASE));
   VOL_MONTHLY=JSON.parse(JSON.stringify(VOL_MONTHLY_BASE));
   for(var k in YEAR_COLORS_MAP)delete YEAR_COLORS_MAP[k];
   for(var k2 in YEAR_COLORS_BASE)YEAR_COLORS_MAP[k2]=YEAR_COLORS_BASE[k2];
-  loadLocal().forEach(extendDerivedWith);
+  cache.forEach(extendDerivedWith);
   VOL_TIMELINE.sort(function(a,b){return a.x.localeCompare(b.x);});
   VOL_MONTHLY.sort(function(a,b){return a[0].localeCompare(b[0]);});
   if(chartsBuilt){chartsBuilt=false;document.getElementById('chartsGrid').innerHTML='';buildProgressCharts();}
@@ -787,88 +951,152 @@ function setSync(state,text){
   document.getElementById('syncText').textContent=text;
 }
 
-/* ── Supabase 雲端 ── */
+/* ============================================================
+   Supabase 雲端
+   - 所有雲端作業排進同一個佇列「一次一件」，避免同時拉取／上傳造成重複寫入
+   - 雲端資料一律先檢查格式再顯示（任何持有公開金鑰的人都能寫入，不能直接信任）
+   ============================================================ */
+var SB=null,CLOUD_ON=false,SB_TABLE='sessions',MAX_CONTENT=5000;
+var __cloudQ=Promise.resolve(),__pullQueued=false,__lastPull=0;
+function cloudConfigured(){var c=window.MONSTER_CONFIG||{};return !!(c.SUPABASE_URL&&c.SUPABASE_ANON_KEY);}
+function cloudEnqueue(fn){
+  __cloudQ=__cloudQ.then(function(){return fn();}).catch(function(e){console.warn('雲端作業失敗',e);});
+  return __cloudQ;
+}
 function cloudInit(){
-  var cfg=window.MONSTER_CONFIG||{};
-  if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY||typeof supabase==='undefined'){
-    CLOUD_ON=false; setSync('local','本機模式'); return;
-  }
+  if(!cloudConfigured()){CLOUD_ON=false;setSync('local','本機模式');return;}
+  if(typeof supabase==='undefined'||!supabase.createClient){CLOUD_ON=false;setSync('err','雲端元件未載入（離線？）');return;}
   try{
-    SB=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
-    CLOUD_ON=true; setSync('busy','連線中…');
-  }catch(e){CLOUD_ON=false; setSync('err','雲端設定有誤');}
+    var cfg=window.MONSTER_CONFIG;
+    /* 不使用登入功能：關閉 session 儲存與 token 自動更新，省下不必要的計時器與儲存 */
+    SB=supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+    CLOUD_ON=true;setSync('busy','連線中…');
+  }catch(e){CLOUD_ON=false;setSync('err','雲端設定有誤');}
+}
+/* 雲端資料列 → 安全的紀錄物件；格式不符回傳 null */
+function sanitizeRow(r){
+  if(!r)return null;
+  var m=String(r.full_date||'').match(/^(\d{4})\/(\d{2})\/(\d{2})$/);if(!m)return null;
+  var y=+m[1],mo=+m[2],d=+m[3];if(!validYMD(y,mo,d))return null;
+  var content=String(r.content==null?'':r.content).trim();
+  if(!content||content.length>MAX_CONTENT)return null;
+  var vol=Number(r.volume);if(!isFinite(vol)||vol<0||vol>1e6)vol=sessionVolumeJS(content);
+  return {year:y,date:mo+'/'+d,full_date:toFullDate(y,mo,d),content:content,volume:Math.round(vol),_synced:true,_id:r.id};
 }
 function markSyncedCard(k){
   var card=RENDERED[k];if(!card)return;
   var d=card.querySelector('.card-date');
-  if(d && !d.querySelector('.cloud-badge'))d.insertAdjacentHTML('beforeend','<span class="cloud-badge">☁︎</span>');
+  if(d && !d.querySelector('.cloud-badge'))d.insertAdjacentHTML('beforeend','<span class="cloud-badge" title="已同步到雲端">☁︎</span>');
 }
-function cloudPush(s){ if(CLOUD_ON)cloudPushAsync(s); }
-async function cloudPushAsync(s){
-  if(!CLOUD_ON)return;
-  try{
-    var payload={year:s.year,date:s.date,full_date:s.full_date,content:s.content,volume:s.volume};
-    var res=await SB.from(SB_TABLE).insert(payload).select();
+/* 分頁抓全部（Supabase 單次預設上限 1000 筆，不分頁會漏資料） */
+async function fetchAllRows(){
+  var all=[],from=0,PAGE=1000;
+  for(;;){
+    var res=await SB.from(SB_TABLE).select('id,year,date,full_date,content,volume').order('id',{ascending:true}).range(from,from+PAGE-1);
     if(res.error)throw res.error;
-    var id=res.data&&res.data[0]&&res.data[0].id;
-    var cache=loadLocal(),k=recKey(s);
-    cache.forEach(function(r){if(recKey(r)===k){r._synced=true;if(id)r._id=id;}});
-    saveLocal(cache); markSyncedCard(k); setSync('on','已同步');
-  }catch(e){console.warn('雲端寫入失敗',e); setSync('err','離線（稍後自動重試）');}
+    var rows=res.data||[];all=all.concat(rows);
+    if(rows.length<PAGE||from>=50000)break;
+    from+=PAGE;
+  }
+  return all;
 }
-function cloudDelete(rec){
-  if(!CLOUD_ON||!rec)return;
-  (async function(){
+/* 上傳多筆（一次 API 呼叫），成功後標記已同步（須在佇列內呼叫） */
+async function pushRecs(recs){
+  if(!recs.length)return;
+  var res=await SB.from(SB_TABLE).insert(recs.map(publicRec)).select('id,full_date,content');
+  if(res.error)throw res.error;
+  var ids={};(res.data||[]).forEach(function(r){ids[recKey(r)]=r.id;});
+  var cache=loadLocal();
+  cache.forEach(function(r){var k=recKey(r);if(k in ids){r._synced=true;r._id=ids[k];}});
+  saveLocal(cache);
+  Object.keys(ids).forEach(markSyncedCard);
+}
+function cloudPushBatch(list){
+  if(!CLOUD_ON||!list.length)return;
+  var want={};list.forEach(function(r){want[recKey(r)]=1;});
+  cloudEnqueue(async function(){
+    /* 排隊期間可能已被刪除或已由同步流程送出 → 送出前重新確認 */
+    var recs=loadLocal().filter(function(r){return want[recKey(r)]&&!r._synced;});
+    if(!recs.length)return;
+    setSync('busy','上傳中…');
+    try{await pushRecs(recs);setSync('on','已同步');}
+    catch(e){console.warn('雲端寫入失敗',e);setSync('err','未同步：恢復連線後自動上傳');}
+  });
+}
+/* 把「待刪除」送到雲端；成功的才移除（須在佇列內呼叫） */
+async function flushTombstones(){
+  if(!CLOUD_ON)return;
+  var t=loadJSON(TOMB_KEY);if(!t.length)return;
+  var done={};
+  for(var i=0;i<t.length;i++){
     try{
-      var q=SB.from(SB_TABLE).delete();
-      if(rec._id)q=q.eq('id',rec._id);
-      else q=q.eq('full_date',rec.full_date).eq('content',rec.content);
-      var res=await q; if(res.error)throw res.error;
-    }catch(e){console.warn('雲端刪除失敗',e);}
-  })();
+      var res=await SB.from(SB_TABLE).delete().eq('full_date',t[i].full_date).eq('content',t[i].content);
+      if(res.error)throw res.error;
+      done[recKey(t[i])]=1;
+    }catch(e){console.warn('雲端刪除失敗（稍後重試）',e);}
+  }
+  /* 重新讀取再過濾：處理期間新增的待刪除不會被覆蓋掉 */
+  saveJSON(TOMB_KEY,loadJSON(TOMB_KEY).filter(function(x){return !done[recKey(x)];}));
 }
-async function cloudPull(){
-  if(!CLOUD_ON)return;
-  setSync('busy','同步中…');
-  try{
-    var res=await SB.from(SB_TABLE).select('*');
-    if(res.error)throw res.error;
-    var rows=res.data||[];
-    var cache=loadLocal(),cacheMap={};
-    cache.forEach(function(r){cacheMap[recKey(r)]=r;});
-    var rowKeys={};
-    rows.forEach(function(r){
-      var rec={year:r.year,date:r.date,full_date:r.full_date,content:r.content,volume:r.volume,_synced:true,_id:r.id};
-      var k=recKey(rec); rowKeys[k]=1;
-      if(BASE_KEYS[k])return;
-      if(cacheMap[k]){cacheMap[k]._synced=true;cacheMap[k]._id=r.id;}
-      else{cache.push(rec);cacheMap[k]=rec;}
-    });
-    var toPush=cache.filter(function(r){return !r._synced && !rowKeys[recKey(r)] && !BASE_KEYS[recKey(r)];});
-    saveLocal(cache);
-    cache.forEach(injectCard);
-    cache.forEach(function(r){if(r._synced)markSyncedCard(recKey(r));});
-    recomputeDerived(); updateLocalCount();
-    for(var i=0;i<toPush.length;i++){await cloudPushAsync(toPush[i]);}
-    setSync('on','已同步 '+rows.length+' 筆');
-  }catch(e){console.warn('同步失敗',e); setSync('err','同步失敗（已用本機）');}
+function cloudPull(){
+  if(!CLOUD_ON)return Promise.resolve();
+  if(__pullQueued)return __cloudQ;        /* 已有一次拉取在排隊，合併成一次 */
+  __pullQueued=true;
+  return cloudEnqueue(async function(){
+    __pullQueued=false;
+    setSync('busy','同步中…');
+    try{
+      await flushTombstones();
+      var raw=await fetchAllRows();
+      __lastPull=Date.now();
+      var tomb={};loadJSON(TOMB_KEY).forEach(function(t){tomb[recKey(t)]=1;});
+      var cache=loadLocal(),cacheMap={},rowKeys={},changed=false,good=0;
+      cache.forEach(function(r){cacheMap[recKey(r)]=r;});
+      raw.forEach(function(row){
+        rowKeys[recKey(row)]=1;
+        var rec=sanitizeRow(row);if(!rec)return;
+        var k=recKey(rec);rowKeys[k]=1;good++;
+        if(BASE_KEYS[k]||tomb[k])return;
+        var c=cacheMap[k];
+        if(c){if(!c._synced||c._id!==rec._id){c._synced=true;c._id=rec._id;changed=true;}}
+        else{cache.push(rec);cacheMap[k]=rec;changed=true;}
+      });
+      /* 其他裝置刪除的紀錄：本機標記已同步、雲端卻已不存在 → 本機也移除
+         （安全閥：雲端整個是空的但本機有多筆已同步資料時，視為設定／連線異常，不刪） */
+      var syncedN=cache.filter(function(r){return r._synced;}).length;
+      var removed=[];
+      if(!(raw.length===0&&syncedN>=5)){
+        cache=cache.filter(function(r){var k=recKey(r);if(r._synced&&!rowKeys[k]){removed.push(k);return false;}return true;});
+      }
+      if(removed.length)changed=true;
+      if(changed)saveLocal(cache);
+      removed.forEach(removeCard);
+      cache.forEach(injectCard);
+      cache.forEach(function(r){if(r._synced)markSyncedCard(recKey(r));});
+      recomputeDerived();refreshCounts();updateLocalCount();
+      var toPush=cache.filter(function(r){return !r._synced&&!rowKeys[recKey(r)];});
+      if(toPush.length)await pushRecs(toPush);
+      setSync('on','已同步 '+(good+toPush.length)+' 筆');
+    }catch(e){console.warn('同步失敗',e);setSync('err','同步失敗（暫用本機資料）');}
+  });
 }
 function cloudResync(){
-  if(CLOUD_ON)cloudPull();
+  if(CLOUD_ON){cloudPull();return;}
+  if(cloudConfigured())showToast('雲端元件未載入，請連上網路後重新開啟 App');
   else showToast('目前為本機模式，未設定雲端同步');
 }
 
 /* ── 匯入（CSV / JSON） ── */
+/* 統一整理成標準紀錄；日期不合法時 full_date 為空（呼叫端會略過並計入「格式不符」） */
 function normalizeRec(o){
   o=o||{};
-  var content=(o.content||'').toString().trim();
-  var fd=(o.full_date||'').toString().trim().replace(/-/g,'/');
-  var date=(o.date||'').toString().trim();
-  if(fd){var p=fd.split('/');if(p.length===3){if(!date)date=parseInt(p[1])+'/'+parseInt(p[2]);
-    fd=p[0]+'/'+String(parseInt(p[1])).padStart(2,'0')+'/'+String(parseInt(p[2])).padStart(2,'0');}}
-  var year=parseInt(o.year)||(fd?parseInt(fd.slice(0,4)):0);
-  var vol=parseFloat(o.volume); if(isNaN(vol))vol=sessionVolumeJS(content);
-  return {year:year,date:date,full_date:fd,content:content,volume:vol};
+  var content=String(o.content==null?'':o.content).trim().replace(/^'(?=[=+\-@])/,'');   /* 還原匯出時的公式防護 */
+  if(content.length>MAX_CONTENT)content='';
+  var p=String(o.full_date==null?'':o.full_date).trim().replace(/-/g,'/').split('/');
+  var y=parseInt(p[0],10),m=parseInt(p[1],10),d=parseInt(p[2],10);
+  if(p.length!==3||!validYMD(y,m,d))return {year:0,date:'',full_date:'',content:content,volume:0};
+  var vol=parseFloat(o.volume);if(!isFinite(vol)||vol<0)vol=sessionVolumeJS(content);
+  return {year:y,date:m+'/'+d,full_date:toFullDate(y,m,d),content:content,volume:Math.round(vol)};
 }
 function parseCSVText(text){
   text=text.replace(/^﻿/,'');
@@ -893,34 +1121,29 @@ function parseImportCSV(text){
   if(h.indexOf('訓練內容')>=0||h.indexOf('完整日期')>=0||h.indexOf('年份')>=0)start=1;
   var out=[];
   for(var i=start;i<rows.length;i++){
-    var r=rows[i]; if(r.length<4)continue;
-    var rec=normalizeRec({year:r[0],date:r[1],full_date:r[2],content:r[3],volume:r[4]});
-    if(rec.full_date&&rec.content)out.push(rec);
+    var r=rows[i];
+    out.push(r.length<4?normalizeRec({}):normalizeRec({year:r[0],date:r[1],full_date:r[2],content:r[3],volume:r[4]}));
   }
   return out;
 }
 function parseImportJSON(text){
   var arr=JSON.parse(text); if(!Array.isArray(arr))throw new Error('JSON 需為陣列格式');
-  return arr.map(normalizeRec).filter(function(r){return r.full_date&&r.content;});
+  return arr.map(normalizeRec);
 }
 function importFromFile(input){
   var file=input.files&&input.files[0]; if(!file)return;
+  if(file.size>5*1024*1024){alert('檔案太大（上限 5MB）');input.value='';return;}
   var reader=new FileReader();
   reader.onload=function(){
     try{
-      var text=reader.result;
-      var recs=file.name.toLowerCase().endsWith('.json')?parseImportJSON(text):parseImportCSV(text);
-      var added=0,skipped=0;
-      recs.forEach(function(s){
-        if(!s.full_date||!s.content){skipped++;return;}
-        if(isDuplicate(s)){skipped++;return;}
-        persistRecord(s); added++;
-      });
-      recomputeDerived(); updateLocalCount();
-      showToast('📤 匯入完成：新增 '+added+' 筆，略過 '+skipped+' 筆重複');
+      var text=String(reader.result||'');
+      var recs=/\.json$/i.test(file.name)?parseImportJSON(text):parseImportCSV(text);
+      var added=persistRecords(recs.filter(function(s){return s.full_date&&s.content;}));
+      showToast('📤 匯入完成：新增 '+added+' 筆，略過 '+(recs.length-added)+' 筆（重複或格式不符）');
     }catch(e){alert('匯入失敗：'+(e.message||e));}
     input.value='';
   };
+  reader.onerror=function(){alert('讀取檔案失敗');input.value='';};
   reader.readAsText(file);
 }
 
@@ -935,63 +1158,73 @@ function openBulkModal(){
   }
   document.getElementById('bulkInput').value='';
   document.getElementById('bulkPreview').innerHTML='尚未偵測到紀錄';
+  var btn=document.getElementById('bulkConfirmBtn');btn.textContent='確認匯入';btn.disabled=true;
   __bulkParsed=[];
   document.getElementById('bulkModal').style.display='flex';
+  document.getElementById('bulkInput').focus();
 }
 function closeBulkModal(){document.getElementById('bulkModal').style.display='none';}
+/* 每個「整行只有日期」的行開始新的一天；沒寫年份時沿用目前年份，
+   月份大幅往回跳（如 12 月→1 月，差 6 個月以上）才視為跨年 +1，
+   所以「新到舊」倒序貼上（7 月→6 月）也不會被誤判成隔年。 */
 function parseBulkSessions(raw,startYear){
-  var lines=(raw||'').replace(/\r/g,'').split('\n');
-  /* 整行就是日期才算（避免動作行誤判）：可有年份、(週X) 之類後綴 */
-  var dateRe=/^\s*(?:(\d{4})[\/\-])?(\d{1,2})[\/\-](\d{1,2})\s*(?:[（(][^）)]*[）)])?\s*$/;
-  var out=[],cur=null,year=startYear,prevMonth=null;
+  var lines=String(raw||'').replace(/\r/g,'').split('\n');
+  var out=[],cur=null,year=startYear,prevMonth=null,ignored=0;
   lines.forEach(function(ln){
     var t=ln.trim();
-    if(!t){return;}
-    var m=t.match(dateRe);
-    if(m){
-      if(cur)out.push(cur);
-      var mo=parseInt(m[2]),dy=parseInt(m[3]);
-      if(m[1]){year=parseInt(m[1]);}
-      else if(prevMonth!==null && mo<prevMonth){year=year+1;}
-      prevMonth=mo;
-      cur={year:year,month:mo,day:dy,exs:[]};
-    }else if(cur){
-      cur.exs.push(t);
+    if(!t)return;
+    var dl=matchDateLine(t,2000);   /* 2000 是閏年：先只檢查格式，年份下面再決定 */
+    if(dl){
+      var y;
+      if(dl.y){y=year=dl.y;}
+      else{
+        if(prevMonth!==null&&prevMonth-dl.m>=6)year=year+1;
+        y=year;
+      }
+      if(validYMD(y,dl.m,dl.d)){
+        prevMonth=dl.m;
+        if(cur)out.push(cur);
+        cur={year:y,month:dl.m,day:dl.d,exs:[]};
+        return;
+      }
     }
+    if(cur)cur.exs.push(t);else ignored++;
   });
   if(cur)out.push(cur);
-  return out.map(function(s){
-    var fd=s.year+'/'+String(s.month).padStart(2,'0')+'/'+String(s.day).padStart(2,'0');
+  var res=out.map(function(s){
     var content=s.exs.join(' ｜ ');
-    return {year:s.year,date:s.month+'/'+s.day,full_date:fd,content:content,volume:sessionVolumeJS(content)};
+    return {year:s.year,date:s.month+'/'+s.day,full_date:toFullDate(s.year,s.month,s.day),content:content,volume:sessionVolumeJS(content)};
   }).filter(function(r){return r.content;});
+  res.ignored=ignored;   /* 第一個日期之前、無法歸屬的行數 */
+  return res;
 }
 function previewBulk(){
   var raw=document.getElementById('bulkInput').value;
-  var yr=parseInt(document.getElementById('bulkYear').value)||new Date().getFullYear();
+  var yr=parseInt(document.getElementById('bulkYear').value,10)||new Date().getFullYear();
   __bulkParsed=parseBulkSessions(raw,yr);
-  var box=document.getElementById('bulkPreview');
-  if(!__bulkParsed.length){box.innerHTML='尚未偵測到紀錄（請確認每天的日期各自單獨一行）';return;}
-  var newN=0,dupN=0,html='';
+  var box=document.getElementById('bulkPreview'),btn=document.getElementById('bulkConfirmBtn');
+  var warn=__bulkParsed.ignored?'<div style="color:#f0a050;margin-bottom:6px">⚠ 第一個日期之前有 '+__bulkParsed.ignored+' 行沒有日期，將不會匯入</div>':'';
+  if(!__bulkParsed.length){
+    box.innerHTML=warn+'尚未偵測到紀錄（請確認每天的日期各自單獨一行）';
+    btn.textContent='確認匯入';btn.disabled=true;return;
+  }
+  var keys=existingKeys(),seen={},newN=0,dupN=0,html='';
   __bulkParsed.forEach(function(r){
-    var dup=isDuplicate(r); if(dup)dupN++; else newN++;
+    var k=recKey(r),dup=!!keys[k]||!!seen[k];seen[k]=1;
+    if(dup)dupN++;else newN++;
     var n=r.content.split('｜').filter(function(x){return x.trim();}).length;
-    html+='<div class="bulk-row'+(dup?' dup':'')+'"><span class="bd">'+(dup?'⚠ ':'✓ ')+r.full_date+'</span>'
+    html+='<div class="bulk-row'+(dup?' dup':'')+'"><span class="bd">'+(dup?'⚠ ':'✓ ')+escapeHTML(r.full_date)+'</span>'
       +'<span class="bv">'+n+' 動作　'+(r.volume?r.volume.toLocaleString()+' kg':'—')+(dup?'　已存在':'')+'</span></div>';
   });
-  box.innerHTML='<div style="margin-bottom:6px;color:#9db0e0">共偵測到 <b>'+__bulkParsed.length+'</b> 天　將新增 <b style="color:#50d090">'+newN+'</b> 筆，略過 <b>'+dupN+'</b> 筆重複</div>'+html;
-  document.getElementById('bulkConfirmBtn').textContent=newN?('確認匯入 '+newN+' 筆'):'沒有可匯入的紀錄';
+  box.innerHTML=warn+'<div style="margin-bottom:6px;color:#9db0e0">共偵測到 <b>'+__bulkParsed.length+'</b> 天　將新增 <b style="color:#50d090">'+newN+'</b> 筆，略過 <b>'+dupN+'</b> 筆重複</div>'+html;
+  btn.textContent=newN?('確認匯入 '+newN+' 筆'):'沒有可匯入的紀錄';
+  btn.disabled=!newN;
 }
 function confirmBulkImport(){
   if(!__bulkParsed.length){alert('沒有偵測到紀錄');return;}
-  var added=0,skipped=0;
-  __bulkParsed.forEach(function(r){
-    if(!r.full_date||!r.content){skipped++;return;}
-    if(isDuplicate(r)){skipped++;return;}
-    persistRecord(r);added++;
-  });
-  recomputeDerived();updateLocalCount();closeBulkModal();
-  showToast('📋 批次匯入完成：新增 '+added+' 筆，略過 '+skipped+' 筆重複');
+  var total=__bulkParsed.length,added=persistRecords(__bulkParsed);
+  closeBulkModal();
+  showToast('📋 批次匯入完成：新增 '+added+' 筆，略過 '+(total-added)+' 筆重複');
 }
 
 /* ── Service Worker（離線 + 安裝） ── */
@@ -999,11 +1232,18 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(function(e){console.warn('SW 註冊失敗',e);});
 }
 
+/* ── 自動同步：恢復網路、或從背景切回 App（超過 30 秒）時重新同步，另一台裝置的新增／刪除也會跟上 ── */
+window.addEventListener('online',function(){if(CLOUD_ON)cloudPull();});
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'&&CLOUD_ON&&Date.now()-__lastPull>30000)cloudPull();
+});
+
 /* ── 初始化 ── */
 window.addEventListener('load',function(){
   updateLocalCount();
   loadLocal().forEach(injectCard);        /* 先用本機快取（離線也能看） */
-  recomputeDerived();
+  recomputeDerived(true);
+  refreshCounts();
   cloudInit();
   if(CLOUD_ON)cloudPull();                 /* 再從雲端拉取，合併同步 */
 });
