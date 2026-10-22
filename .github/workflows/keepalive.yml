@@ -1,0 +1,44 @@
+# Supabase 保活：免費專案 7 天沒使用會自動暫停，這裡每 3 天查一次資料庫（只讀 1 筆）。
+# 網址與 publishable key 直接從 config.js 讀（本來就是公開的），換 key 不用改這裡。
+# GitHub 會在 repo 60 天沒動靜時停用排程，所以最後一步呼叫 API 重新啟用自己（不產生 commit）。
+# 查詢失敗時這次執行會標紅，GitHub 會寄信通知 → 到 Supabase dashboard 按 Resume project。
+name: Supabase keepalive
+
+on:
+  schedule:
+    - cron: "17 3 */3 * *"   # UTC 03:17（台灣 11:17），每 3 天
+  workflow_dispatch:          # 可在 Actions 頁手動執行
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: config.js
+          sparse-checkout-cone-mode: false
+
+      - name: Query Supabase
+        run: |
+          URL=$(sed -n 's/.*SUPABASE_URL: *"\([^"]*\)".*/\1/p' config.js)
+          KEY=$(sed -n 's/.*SUPABASE_ANON_KEY: *"\([^"]*\)".*/\1/p' config.js)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "config.js 讀不到 SUPABASE_URL / KEY"; exit 1; fi
+          CODE=$(curl -sS -o body.txt -w "%{http_code}" --retry 3 --retry-delay 20 --retry-all-errors \
+            "$URL/rest/v1/sessions?select=id&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY") || CODE=000
+          echo "HTTP $CODE"
+          if [ "$CODE" != "200" ]; then cat body.txt 2>/dev/null; echo "::error::Supabase 沒回應（可能已暫停），請到 dashboard 按 Resume project"; exit 1; fi
+
+      - name: Keep this workflow enabled
+        if: always()
+        run: |
+          curl -sS -f -X PUT \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/keepalive.yml/enable"
+          echo "workflow re-enabled"
