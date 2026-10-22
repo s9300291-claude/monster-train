@@ -13,6 +13,7 @@
 | `config.js` | **雲端同步的設定（要填 2 個值）** | ✅ 要改 |
 | `manifest.webmanifest` / `sw.js` | 讓它能「安裝成 App」、可離線 | ❌ 不用改 |
 | `icon-*.png` | App 圖示 | ❌ 不用改 |
+| `.github/workflows/keepalive.yml` | 每 3 天自動「戳」一下雲端資料庫，避免免費專案被暫停（見下方「雲端保活」） | ❌ 不用改 |
 
 > 即使**完全不設定雲端**，直接用也可以——只是紀錄只會存在「當下這台裝置」（畫面右上角會顯示「本機模式」）。
 > 要做到跨裝置同步，請完成下面 **步驟 1 + 步驟 2**。
@@ -119,6 +120,20 @@ window.MONSTER_CONFIG = {
 
 - App 會優先抓網路上的最新版，**改版後重新開啟一次**就會是新版（離線時才用快取）。
 - 改版時請把 `sw.js` 最上面的 `VERSION` 加 1（例如 `v2` → `v3`），舊快取會自動清掉。
+
+---
+
+## 💤 雲端保活（避免 Supabase 免費專案被暫停）
+
+Supabase 免費專案**連續 7 天沒有使用就會自動暫停**（2026-10-22 發生過一次）。暫停時 App 會顯示「同步失敗（暫用本機資料）」，資料不會掉，但要到 Supabase dashboard 按 **Resume project**（約 2 分鐘恢復）。
+
+為了不再發生，repo 裡有 GitHub Actions 工作流程 `.github/workflows/keepalive.yml`：
+
+- **每 3 天**（台灣時間約 11:17）自動向資料庫查 1 筆紀錄（只讀，不改資料）。網址與金鑰直接讀 `config.js`，換金鑰不用改它。
+- GitHub 規定 repo **60 天沒動靜會停用排程**；工作流程每次跑完會呼叫 GitHub API 重新啟用自己（不產生 commit、不會讓網站重新部署）。
+- 想手動跑一次：GitHub repo → **Actions** → 左側 **Supabase keepalive** → **Run workflow**。
+- **如果哪天收到 GitHub「Run failed: Supabase keepalive」的通知信**：代表資料庫沒回應（多半是已被暫停），請登入 Supabase dashboard 按 Resume project，再手動跑一次確認變綠。
+- 萬一收到「scheduled workflow will be disabled」的通知信，到上面同一頁按 Enable workflow 即可。
 
 ---
 
